@@ -530,6 +530,25 @@ class TestCli(unittest.TestCase):
             with open(path, "rb") as fh:
                 self.assertEqual(fh.read(), data)
 
+    def test_json_case_folded_alias_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path, data = self._archive(tmp)
+            other = os.path.join(tmp, "SYNTHETIC.RPF")
+
+            # Simulate the shared helper recognizing case-only aliases on a folding volume, so this
+            # guard test runs the same way on case-sensitive and case-insensitive test filesystems.
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with (mock.patch.object(ss, "same_report_path", return_value=True) as same_report_path,
+                  contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr)):
+                result = ss.main([path, "--json", other])
+
+            self.assertEqual(result, 2)
+            self.assertIn("would overwrite the input", stderr.getvalue())
+            self.assertEqual(stdout.getvalue(), "")
+            same_report_path.assert_called_once_with(other, path)
+            with open(path, "rb") as fh:
+                self.assertEqual(fh.read(), data)
+
     def test_json_that_is_a_directory_is_refused_before_the_scan(self):
         with tempfile.TemporaryDirectory() as tmp:
             path, _ = self._archive(tmp)
