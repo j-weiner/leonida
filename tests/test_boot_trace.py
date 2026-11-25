@@ -210,6 +210,39 @@ class BootTraceTests(unittest.TestCase):
         self.assertEqual(trace["events"], 2)
         self.assertEqual(trace["bad_lines"], 1)
 
+    def test_map_without_module_is_bad_and_does_not_break_reports(self):
+        self.write(
+            self.startup,
+            [
+                {"kind": "map", "module": "synthetic.dll", "relocated": True},
+                {"kind": "map"},
+                {"kind": "exit", "code": 0},
+            ],
+        )
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(bt.main([self.startup]), 0)
+        self.assertIn("modules (1): synthetic.dll (relocated)", output.getvalue())
+
+        trace = bt.parse_startup(self.startup)
+        self.assertEqual(trace["events"], 2)
+        self.assertEqual(trace["bad_lines"], 1)
+        self.assertEqual(trace["bad_line_numbers"], [2])
+        self.assertEqual(trace["kinds"], {"map": 1, "exit": 1})
+        self.assertEqual([module["module"] for module in trace["modules"]], ["synthetic.dll"])
+        self.assertIn(
+            "modules (1): synthetic.dll (relocated)",
+            bt.format_text(bt.summarize(trace, None), 10),
+        )
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(bt.main([self.startup, "--counts-only"]), 0)
+        counts = json.loads(output.getvalue())["startup"]
+        self.assertEqual(counts["modules"], 1)
+        self.assertEqual(counts["events"], 2)
+        self.assertEqual(counts["bad_lines"], 1)
+
     def test_malformed_exit_records_preserve_the_last_valid_code(self):
         for code in (0, -7):
             with self.subTest(code=code):

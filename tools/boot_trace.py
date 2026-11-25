@@ -101,8 +101,15 @@ def parse_startup(path: str, limit: int = 10) -> dict:
                 if len(trace["bad_line_numbers"]) < limit:
                     trace["bad_line_numbers"].append(number)
                 continue
-            trace["events"] += 1
             kind = str(event.get("kind"))
+            if kind == "map" and not (
+                isinstance(event.get("module"), str) and event["module"].strip()
+            ):
+                trace["bad_lines"] += 1
+                if len(trace["bad_line_numbers"]) < limit:
+                    trace["bad_line_numbers"].append(number)
+                continue
+            trace["events"] += 1
             trace["kinds"][kind] = trace["kinds"].get(kind, 0) + 1
             if kind == "trace_open":
                 trace["pid"] = event.get("pid")
